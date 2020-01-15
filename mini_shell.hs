@@ -7,6 +7,7 @@ type Data = String
 data FSItem = File Name Data | Directory Name [FSItem]
   deriving (Eq, Show)
 
+-- basic Zipper explanation: http://learnyouahaskell.com/zippers
 data FSCrumb = FSCrumb Name [FSItem] [FSItem]
 type FSZipper = (FSItem, [FSCrumb])
 
@@ -35,7 +36,7 @@ moveZipper name (Directory dirName fsitems, cs)
  | null name && null dirName = (Directory dirName fsitems, cs)
  | otherwise = let (ls, itemToFocus:rs) = break (namesMatch name) fsitems in (itemToFocus, FSCrumb dirName ls rs :cs)
 
--- works through an absolute path given by a list of directory names and moves the zipper accordingly
+-- works through a path (relative to the current item of the zipper) given by a list of directory names and moves the zipper accordingly
 workThroughPath :: [String] -> FSZipper -> FSZipper
 workThroughPath [] currentFocus = currentFocus
 workThroughPath (s:ss) currentFocus = workThroughPath ss (moveZipper s currentFocus)
@@ -76,9 +77,11 @@ itemAlreadyContained name (f:fs) = namesMatch name f || itemAlreadyContained nam
 insertAlphabetically :: FSItem -> [FSItem] -> [FSItem] -> [FSItem]
 insertAlphabetically (File name text) [] ls = ls ++ [File name text]
 insertAlphabetically (Directory name fs2) [] ls = ls ++ [Directory name fs2]
+-- if we are inserting a Directory and we have reached a file, insert the Directory
 insertAlphabetically (Directory name fs2) ((File fileName text):fs) ls = ls ++ [Directory name fs2] ++ ((File fileName text):fs)
-
+-- if we are inserting a file, skip all Directories
 insertAlphabetically (File name text) (Directory dirName fs2 :fs) ls = insertAlphabetically (File name text) fs (ls ++ [Directory dirName fs2])
+-- check if we should insert our item or continue moving through the FSItems
 insertAlphabetically (File name text) (File name2 text2 :fs) ls
     | name > name2 = insertAlphabetically (File name text) fs (ls ++ [File name2 text2])
     | otherwise = ls ++ [File name text] ++ [File name2 text2] ++ fs
@@ -114,9 +117,27 @@ edit :: String -> String -> FSZipper -> FSItem
 edit absPath newData zipper = let dirList = splitOn absPath '/' [] []; (File fileName _, FSCrumb dirName ls rs : cs) = workThroughPath dirList zipper
   in zipperToItem (Directory dirName (ls ++ [File fileName newData] ++ rs), cs)
 
+cd :: String -> FSZipper -> FSZipper
+cd path (File fileName content, FSCrumb name ls rs : cs)
+  | path == ".." = (Directory name (ls ++ [File fileName content] ++ rs), cs)
+  | otherwise = (File fileName content, FSCrumb name ls rs : cs)
+-- if our FSCrumb list is empty, it means that we are in the root directory
+cd path (Directory dirName fs,  [])
+  -- and "cd .." will return the unchanged Zipper
+  | path == ".." = (Directory dirName fs, [])
+  -- the path will be an absolute path
+  | otherwise = let dirList = splitOn path '/' [] []
+    in workThroughPath dirList (Directory dirName fs, [])
+cd path (Directory dirName fs, FSCrumb name ls rs : cs)
+  -- move up one directory
+  | path == ".." = (Directory name (ls ++ [Directory dirName fs] ++ rs), cs)
+  | otherwise = let dirList = splitOn path '/' [] []
+    in workThroughPath dirList (Directory dirName fs, FSCrumb name ls rs : cs)
+
 -- take inputs from the user and handle them
 mainHelp :: FSZipper -> IO ()
 mainHelp zipper = do
+    putStr "> "
     userInput <- getLine
     let { parsedInput = splitOn userInput ' ' [] [] }
     case (head parsedInput) of {
@@ -143,6 +164,10 @@ mainHelp zipper = do
               newRoot = edit path newData zipper}
         putStrLn (pretty newRoot)
         mainHelp (newRoot, []));
+      "cd" -> (do
+        let { (newItem, cs) = cd (fixWrongTestInput (last parsedInput)) zipper }
+        putStrLn (pretty (newItem))
+        mainHelp (newItem, cs));
       other -> mainHelp zipper
     }
 

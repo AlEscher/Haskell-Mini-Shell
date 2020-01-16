@@ -96,6 +96,10 @@ fixWrongTestInput [] = []
 -- length > 1 so that we dont accidentally delete the path "/" (root)
 fixWrongTestInput s = if length s > 1 && (last s == '/') then init s else s
 
+isFocusOnFile :: FSZipper -> Bool
+isFocusOnFile (File name content, cs) = True
+isFocusOnFile (Directory name fs, cs) = False
+
 -- given an absolute path, moves the zipper to the last directory and inserts the new directory into it (returns the new root directory)
 mkdir :: String -> FSZipper -> FSItem
 mkdir absPath zipper = let dirList = splitOn absPath '/' [] []; dirToInsert = last dirList; path = init dirList; (Directory dirName fs, cs) = workThroughPath path zipper
@@ -138,6 +142,11 @@ cd path (Directory dirName fs, FSCrumb name ls rs : cs)
 
 -- take inputs from the user and handle them
 mainHelp :: FSZipper -> IO ()
+-- if our zipper is on a file (for example after cd), move up one directory
+mainHelp (File fileName content, FSCrumb name ls rs :cs) = do
+   let { (newItem, cs) = (Directory name (ls ++ [File fileName content] ++ rs), cs) }
+   putStrLn (pretty newItem)
+   mainHelp (newItem, cs)
 mainHelp zipper = do
     putStr "> "
     userInput <- getLine
@@ -168,7 +177,8 @@ mainHelp zipper = do
         mainHelp (newRoot, []));
       "cd" -> (do
         let { (newItem, cs) = cd (fixWrongTestInput (last parsedInput)) zipper }
-        putStrLn (pretty (newItem))
+        -- if we cd into a file, don't print anything, the next call of mainHelp will go back up one directory
+        if (isFocusOnFile (newItem, cs)) then putStr "" else putStrLn (pretty (newItem))
         mainHelp (newItem, cs));
       other -> mainHelp zipper
     }

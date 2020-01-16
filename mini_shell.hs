@@ -120,17 +120,19 @@ edit absPath newData zipper = let dirList = splitOn absPath '/' [] []; (File fil
 cd :: String -> FSZipper -> FSZipper
 cd path (File fileName content, FSCrumb name ls rs : cs)
   | path == ".." = (Directory name (ls ++ [File fileName content] ++ rs), cs)
+  | path == "." = (File fileName content, FSCrumb name ls rs : cs)
   | otherwise = (File fileName content, FSCrumb name ls rs : cs)
 -- if our FSCrumb list is empty, it means that we are in the root directory
 cd path (Directory dirName fs,  [])
   -- and "cd .." will return the unchanged Zipper
-  | path == ".." = (Directory dirName fs, [])
+  | path == ".." || path == "." = (Directory dirName fs, [])
   -- the path will be an absolute path
   | otherwise = let dirList = splitOn path '/' [] []
     in workThroughPath dirList (Directory dirName fs, [])
 cd path (Directory dirName fs, FSCrumb name ls rs : cs)
   -- move up one directory
   | path == ".." = (Directory name (ls ++ [Directory dirName fs] ++ rs), cs)
+  | path == "." = (Directory dirName fs, FSCrumb name ls rs : cs)
   | otherwise = let dirList = splitOn path '/' [] []
     in workThroughPath dirList (Directory dirName fs, FSCrumb name ls rs : cs)
 

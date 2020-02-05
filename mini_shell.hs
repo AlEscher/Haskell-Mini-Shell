@@ -11,23 +11,6 @@ data FSItem = File Name Data | Directory Name [FSItem]
 data FSCrumb = FSCrumb Name [FSItem] [FSItem]
 type FSZipper = (FSItem, [FSCrumb])
 
--- fs = Directory "" [ Directory "Last" [ Directory "Christmas" [ File "heart.wav" "I gave you" ], File "Merry" "Christmas"], File "proof.cprf" "Stop Lemma Time"]
-indent :: Int -> String
-indent i = [' ' | x <- [1..i*2]]
-prettyHelp :: FSItem -> Int -> Bool -> String
-prettyHelp (File name dat) depth _ = indent depth ++ "|- " ++ name ++ " \"" ++ dat ++ "\"\n"
-prettyHelp (Directory name []) depth printName
-  | null name = "/\n"
-  | printName = indent depth ++ "|- " ++ name ++ "/\n"
-  | otherwise = []
-prettyHelp (Directory name (f:fs)) depth printName
-  | null name = "/\n" ++ prettyHelp f 0 True ++ prettyHelp (Directory "foo" fs) 0 False
-  | printName = indent depth ++ "|- " ++ name ++ "/\n" ++ prettyHelp f (depth+1) True ++ prettyHelp (Directory name fs) (depth+1) False
-  | otherwise = prettyHelp f depth True ++ prettyHelp (Directory name fs) depth False
--- show a FSItem as a String
-pretty :: FSItem -> String
-pretty f = prettyHelp f 0 True
-
 -- moves the Zipper one level down, into a directory / file specified by "name"
 moveZipper :: Name -> FSZipper -> FSZipper
 moveZipper name (Directory dirName [], cs) = (Directory dirName [], cs)
@@ -139,6 +122,22 @@ cd path (Directory dirName fs, FSCrumb name ls rs : cs)
   | path == "." = (Directory dirName fs, FSCrumb name ls rs : cs)
   | otherwise = let dirList = splitOn path '/' [] []
     in workThroughPath dirList (Directory dirName fs, FSCrumb name ls rs : cs)
+    
+-- show a FSItem as a String
+pretty :: FSItem -> String
+pretty f = prettyHelp f 0 True
+prettyHelp :: FSItem -> Int -> Bool -> String
+prettyHelp (File name dat) depth _ = indent depth ++ "|- " ++ name ++ " \"" ++ dat ++ "\"\n"
+prettyHelp (Directory name []) depth printName
+  | null name = "/\n"
+  | printName = indent depth ++ "|- " ++ name ++ "/\n"
+  | otherwise = []
+prettyHelp (Directory name (f:fs)) depth printName
+  | null name = "/\n" ++ prettyHelp f 0 True ++ prettyHelp (Directory "foo" fs) 0 False
+  | printName = indent depth ++ "|- " ++ name ++ "/\n" ++ prettyHelp f (depth+1) True ++ prettyHelp (Directory name fs) (depth+1) False
+  | otherwise = prettyHelp f depth True ++ prettyHelp (Directory name fs) depth False
+indent :: Int -> String
+indent i = [' ' | x <- [1..i*2]]
 
 -- take inputs from the user and handle them
 mainHelp :: FSZipper -> IO ()

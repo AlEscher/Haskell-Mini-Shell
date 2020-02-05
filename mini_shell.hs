@@ -53,8 +53,7 @@ handleEditData (s:ss) = s ++ " " ++ handleEditData ss
 
 -- check if a Name (for a File or Directory) is already contained in the FSItem-list of a Directory
 itemAlreadyContained :: Name -> [FSItem] -> Bool
-itemAlreadyContained _ [] = False
-itemAlreadyContained name (f:fs) = namesMatch name f || itemAlreadyContained name fs
+itemAlreadyContained name fs = not $ null $ filter (namesMatch name) fs
 
 -- insert an FSItem in alphabetical order: Directories always come first, then all Files
 insertAlphabetically :: FSItem -> [FSItem] -> [FSItem] -> [FSItem]
